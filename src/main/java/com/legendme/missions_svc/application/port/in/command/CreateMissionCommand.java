@@ -8,6 +8,9 @@ import java.util.UUID;
 /**
  * Este comando representa los datos necesarios para crear una misión.
  * Se usa dentro del caso de uso CreateMissionUseCase.
+ * Contiene información como el ID del usuario, categoría, título, descripción,
+ * fecha de vencimiento, dificultad y grupo de racha.
+ * Es un registro inmutable que facilita el transporte de datos entre capas de la aplicación.
  */
 public record CreateMissionCommand(
         UUID userId,
