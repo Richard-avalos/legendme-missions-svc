@@ -17,5 +17,5 @@ public interface ListCategoriesUseCase {
      *
      * @return Una lista de categorías.
      */
-    List<Category> execute();
+    List<Category> listCategoriesExecute();
 }

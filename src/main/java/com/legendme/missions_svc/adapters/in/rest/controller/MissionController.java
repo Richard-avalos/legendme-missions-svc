@@ -6,6 +6,7 @@ import com.legendme.missions_svc.application.port.in.command.SearchMissionComman
 import com.legendme.missions_svc.application.mapper.MissionMapper;
 import com.legendme.missions_svc.application.port.in.*;
 import com.legendme.missions_svc.domain.model.Mission;
+import com.legendme.missions_svc.shared.exceptions.ErrorException;
 import com.legendme.missions_svc.util.JwtUtils;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -24,34 +25,11 @@ import java.util.stream.Collectors;
 @RequestMapping("/legendme/missions")
 public class MissionController {
 
-    private final CreateMissionUseCase createMissionUseCase;
-    private final SearchMissionsUseCase searchMissionsUseCase;
-    private final GetMissionDetailUseCase getMissionDetailUseCase;
-    private final StartMissionUseCase startMissionUseCase;
-    private final PauseMissionUseCase pauseMissionUseCase;
-    private final CompleteMissionUseCase completeMissionUseCase;
-    private final CancelMissionUseCase cancelMissionUseCase;
+    private final MissionUseCase missionUseCase;
     private final JwtUtils jwtUtils;
 
-    /**
-     * Constructor para inyectar las dependencias necesarias.
-     */
-    public MissionController(
-            CreateMissionUseCase createMissionUseCase,
-            SearchMissionsUseCase searchMissionsUseCase,
-            GetMissionDetailUseCase getMissionDetailUseCase,
-            StartMissionUseCase startMissionUseCase,
-            PauseMissionUseCase pauseMissionUseCase,
-            CompleteMissionUseCase completeMissionUseCase,
-            CancelMissionUseCase cancelMissionUseCase, JwtUtils jwtUtils
-    ) {
-        this.createMissionUseCase = createMissionUseCase;
-        this.searchMissionsUseCase = searchMissionsUseCase;
-        this.getMissionDetailUseCase = getMissionDetailUseCase;
-        this.startMissionUseCase = startMissionUseCase;
-        this.pauseMissionUseCase = pauseMissionUseCase;
-        this.completeMissionUseCase = completeMissionUseCase;
-        this.cancelMissionUseCase = cancelMissionUseCase;
+    public MissionController(MissionUseCase missionUseCase, JwtUtils jwtUtils) {
+        this.missionUseCase = missionUseCase;
         this.jwtUtils = jwtUtils;
     }
 
@@ -88,27 +66,43 @@ public class MissionController {
 
     /**
      * Maneja la creación de una nueva misión.
-     * @param authHeader
-     * @param request
-     * @return
      */
-    @PostMapping
+    @PostMapping("/create")
     public ResponseEntity<?> createMission(
             @RequestHeader("Authorization") String authHeader,
             @Valid @RequestBody CreateMissionRequest request
     ) {
-        UUID userId = getUserId(authHeader);
-        var cmd = new CreateMissionCommand(
-                userId,
-                request.categoryId(),
-                request.title(),
-                request.description(),
-                request.dueAt(),
-                request.difficulty(),
-                request.streakGroup()
-        );
-        return ResponseEntity.status(HttpStatus.CREATED).body(MissionMapper.toResponse(createMissionUseCase.execute(cmd)));
+        try {
+            UUID userId = getUserId(authHeader);
+
+            var cmd = new CreateMissionCommand(
+                    userId,
+                    request.categoryId(),
+                    request.title(),
+                    request.description(),
+                    request.dueAt(),
+                    request.difficulty(),
+                    request.streakGroup()
+            );
+
+
+            var mission = missionUseCase.createMission(cmd);
+
+
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(MissionMapper.toResponse(mission));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Ocurrió un error creando la misión: " + e.getMessage());
+        }
     }
+
+
+
 
     /**
      * Maneja la búsqueda de misiones según los criterios especificados.
@@ -129,7 +123,7 @@ public class MissionController {
                 Optional.ofNullable(request).map(MissionSearchRequest::from).orElse(null),
                 Optional.ofNullable(request).map(MissionSearchRequest::to).orElse(null)
         );
-        return ok(searchMissionsUseCase.execute(cmd, userId));
+        return ok(missionUseCase.searchMission(cmd, userId));
     }
 
     /**
@@ -139,13 +133,13 @@ public class MissionController {
      * @param id         El ID de la misión cuyos detalles se desean obtener.
      * @return Una respuesta HTTP con los detalles de la misión solicitada.
      */
-    @GetMapping("/{id}")
+    @GetMapping("/search-by-id/{id}")
     public ResponseEntity<?> getMissionDetail(
             @RequestHeader("Authorization") String authHeader,
             @PathVariable UUID id
     ) {
         UUID userId = getUserId(authHeader);
-        return ok(getMissionDetailUseCase.execute(id, userId));
+        return ok(missionUseCase.getMissionDetail(id, userId));
     }
 
     /**
@@ -161,7 +155,7 @@ public class MissionController {
             @PathVariable UUID id
     ) {
         UUID userId = getUserId(authHeader);
-        return ok(startMissionUseCase.execute(id, userId));
+        return ok(missionUseCase.startMission(id, userId));
     }
 
     /**
@@ -180,7 +174,7 @@ public class MissionController {
     ) {
         UUID userId = getUserId(authHeader);
         String note = Optional.ofNullable(pauseRequest).map(PauseRequest::note).orElse(null);
-        return ok(pauseMissionUseCase.execute(id, userId, note));
+        return ok(missionUseCase.pauseMission(id, userId, note));
     }
 
     /**
@@ -200,16 +194,16 @@ public class MissionController {
             @RequestBody(required = false) CompleteRequest completeRequest
     ) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            return ResponseEntity.status(HttpStatus.PRECONDITION_REQUIRED)
-                    .body(new com.legendme.missions_svc.adapters.in.rest.dto.ErrorResponse(
-                            "PRECONDITION_REQUIRED",
-                            "Missing Idempotency-Key",
-                            "Header required"
-                    ));
+            throw new ErrorException(
+                    HttpStatus.PRECONDITION_REQUIRED,
+                    "PRECONDITION_REQUIRED",
+                    "Missing Idempotency-Key",
+                    "Header required"
+            );
         }
         UUID userId = getUserId(authHeader);
         String note = Optional.ofNullable(completeRequest).map(CompleteRequest::note).orElse(null);
-        return ok(completeMissionUseCase.execute(id, userId, idempotencyKey, note));
+        return ok(missionUseCase.completeMission(id, userId, idempotencyKey, note));
     }
 
     /**
@@ -228,7 +222,7 @@ public class MissionController {
     ) {
         UUID userId = getUserId(authHeader);
         String reason = Optional.ofNullable(cancelRequest).map(CancelRequest::reason).orElse(null);
-        return ok(cancelMissionUseCase.execute(id, userId, reason));
+        return ok(missionUseCase.cancelMission(id, userId, reason));
     }
 
     /**Estas clases representan las solicitudes para pausar, completar y cancelar misiones. */

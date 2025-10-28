@@ -12,12 +12,12 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class ListCategoriesService implements ListCategoriesUseCase {
+public class CategoriesService implements ListCategoriesUseCase {
 
     private final CategoryRepository categoryRepository;
 
     @Override
-    public List<Category> execute() {
+    public List<Category> listCategoriesExecute() {
         return categoryRepository.findAllActive();
     }
 }

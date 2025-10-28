@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
 /**
  * Adaptador de persistencia para la entidad Mission.
  * Implementa el puerto de salida MissionRepository utilizando Spring Data JPA.
@@ -26,55 +27,83 @@ public class MissionPersistenceAdapter implements MissionRepository {
 
     private final SpringDataMissionRepository spring;
 
+    /**
+     * Guardar una misión nueva.
+     */
     @Override
     @Transactional
     public Mission save(Mission mission) {
+        if (mission.uuid() != null) {
+            throw new IllegalArgumentException("Use updateMission() to modify an existing mission");
+        }
 
-        MissionEntity entity;
+        MissionEntity entity = toEntity(mission);
+        entity.setId(UUID.randomUUID());
+        LocalDateTime now = LocalDateTime.now();
+        entity.setCreatedAt(now);
+        entity.setUpdatedAt(now);
 
+        MissionEntity saved = spring.save(entity);
+        return toDomain(saved);
+    }
+
+    /**
+     * Actualizar una misión existente.
+     */
+    @Transactional
+    public Mission update(Mission mission) {
         if (mission.uuid() == null) {
-            // NUEVA
-            entity = toEntity(mission);
-            if (entity.getId() == null) entity.setId(UUID.randomUUID());
-            LocalDateTime now = LocalDateTime.now();
-            entity.setCreatedAt(now);
-            entity.setUpdatedAt(now);
+            throw new IllegalArgumentException("Cannot update a mission without UUID");
+        }
 
-        } else {
-            // ACTUALIZAR EXISTENTE
-            entity = spring.findById(mission.uuid())
-                    .orElseGet(() -> toEntity(mission));
+        MissionEntity entity = spring.findById(mission.uuid())
+                .orElseThrow(() -> new IllegalArgumentException("Mission not found: " + mission.uuid()));
 
-            entity.setTitle(mission.title());
-            entity.setDescription(mission.description());
-            entity.setBaseXp(mission.baseXp());
-            entity.setDifficulty(mission.difficulty());
-            entity.setStreakGroup(mission.streakGroup());
-            entity.setStatus(mission.status());
-            entity.setStartedAt(mission.startedAt());
-            entity.setDueAt(mission.dueAt());
-            entity.setCompletedAt(mission.completedAt());
-            entity.setUpdatedAt(LocalDateTime.now());
+        // Actualizar campos mutables
+        entity.setTitle(mission.title());
+        entity.setDescription(mission.description());
+        entity.setBaseXp(mission.baseXp());
+        entity.setDifficulty(mission.difficulty());
+        entity.setStreakGroup(mission.streakGroup());
+        entity.setStatus(mission.status());
+        entity.setStartedAt(mission.startedAt());
+        entity.setDueAt(mission.dueAt());
+        entity.setCompletedAt(mission.completedAt());
+        entity.setUpdatedAt(LocalDateTime.now());
 
-            // category: solo referencia
-            if (entity.getCategory() == null || !entity.getCategory().getId().equals(mission.category().id())) {
-                entity.setCategory(CategoryEntity.builder()
-                        .id(mission.category().id())
-                        .build());
-            }
+        // Actualizar categoría si es diferente
+        if (entity.getCategory() == null || !entity.getCategory().getId().equals(mission.category().id())) {
+            entity.setCategory(CategoryEntity.builder()
+                    .id(mission.category().id())
+                    .build());
         }
 
         MissionEntity saved = spring.save(entity);
         return toDomain(saved);
     }
 
+    @Override
+    public Optional<Mission> findById(UUID id) {
+        return spring.findById(id).map(this::toDomain);
+    }
+
+    @Override
+    public List<Mission> findByUserIdAndFilter(UUID userId, MissionStatus status, String categoryCode,
+                                               LocalDateTime from, LocalDateTime to) {
+        return spring.search(userId, status, categoryCode, from, to)
+                .stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Convierte una misión de dominio a entidad JPA.
+     */
     private MissionEntity toEntity(Mission m) {
         return MissionEntity.builder()
                 .id(m.uuid())
                 .userId(m.userId())
-                .category(CategoryEntity.builder()
-                        .id(m.category().id())
-                        .build())
+                .category(CategoryEntity.builder().id(m.category().id()).build())
                 .title(m.title())
                 .description(m.description())
                 .baseXp(m.baseXp())
@@ -89,17 +118,9 @@ public class MissionPersistenceAdapter implements MissionRepository {
                 .build();
     }
 
-    @Override
-    public Optional<Mission> findById(UUID id) {
-        return spring.findById(id).map(this::toDomain);
-    }
-
-    @Override
-    public List<Mission> findByUserIdandFilter(UUID userId, MissionStatus status, String categoryCode, LocalDateTime from, LocalDateTime to) {
-        List<MissionEntity> found = spring.search(userId, status, categoryCode, from, to);
-        return found.stream().map(this::toDomain).collect(Collectors.toList());
-    }
-
+    /**
+     * Convierte una entidad JPA a objeto de dominio.
+     */
     private Mission toDomain(MissionEntity e) {
         Category c = new Category(
                 e.getCategory().getId(),

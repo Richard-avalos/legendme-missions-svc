@@ -4,7 +4,6 @@ import com.legendme.missions_svc.domain.model.enums.Difficulty;
 import com.legendme.missions_svc.domain.model.enums.MissionStatus;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.GenericGenerator;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -33,8 +32,8 @@ public class MissionEntity {
     @JoinColumn(name = "category_id", nullable = false)
     private CategoryEntity category;
 
-    @Column(name = "title", nullable = false, length = 255)
-    private String title; // <- se llama title aquí pero apunta a "name" en BD
+    @Column(name = "title", nullable = false)
+    private String title;
 
     @Column(name = "description", length = 2000)
     private String description;

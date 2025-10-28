@@ -41,4 +41,22 @@ public record Mission(
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
+    public Mission withStatus(MissionStatus newStatus) {
+        return new Mission(
+                this.uuid(),
+                this.userId(),
+                this.category(),
+                this.title(),
+                this.description(),
+                this.baseXp(),
+                this.difficulty(),
+                this.streakGroup(),
+                newStatus,
+                this.startedAt(),
+                this.dueAt(),
+                this.completedAt(),
+                this.createdAt(),
+                LocalDateTime.now()
+        );
+    }
 }

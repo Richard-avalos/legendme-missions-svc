@@ -4,7 +4,7 @@ import com.legendme.missions_svc.adapters.out.persistence.entity.CategoryEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
-import java.util.UUID;
+
 /**
  * Repositorio Spring Data JPA para la entidad CategoryEntity.
  */

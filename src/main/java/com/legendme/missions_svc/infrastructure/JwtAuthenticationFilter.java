@@ -1,4 +1,4 @@
-package com.legendme.missions_svc.config;
+package com.legendme.missions_svc.infrastructure;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

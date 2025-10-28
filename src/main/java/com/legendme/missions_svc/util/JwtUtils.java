@@ -1,5 +1,6 @@
 package com.legendme.missions_svc.util;
 
+import com.legendme.missions_svc.shared.exceptions.ErrorException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,7 +47,7 @@ public class JwtUtils {
      */
     public UUID extractUserIdFromAuthorizationHeader(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new RuntimeException("Authorization header missing or invalid");
+            throw new ErrorException("Authorization header missing or invalid");
         }
         String token = authHeader.substring(7);
         String subj = validateTokenAndGetSubject(token);

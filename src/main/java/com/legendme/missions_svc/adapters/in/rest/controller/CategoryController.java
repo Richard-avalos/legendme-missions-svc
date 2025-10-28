@@ -37,7 +37,7 @@ public class CategoryController {
      * @param authHeader El encabezado de autorización que contiene el token JWT.
      * @return Una respuesta HTTP con la lista de categorías o un error de autorización.
      */
-    @GetMapping
+    @GetMapping("/list-categories")
     public ResponseEntity<List<?>> listCategories(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         if (authHeader == null || authHeader.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -45,7 +45,7 @@ public class CategoryController {
         }
 
         jwtUtils.extractUserIdFromAuthorizationHeader(authHeader);
-        var response = listCategoriesUseCase.execute()
+        var response = listCategoriesUseCase.listCategoriesExecute()
                 .stream()
                 .map(CategoryMapper::toResponse)
                 .toList();

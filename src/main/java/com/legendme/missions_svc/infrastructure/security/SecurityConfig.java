@@ -1,5 +1,6 @@
-package com.legendme.missions_svc.config;
+package com.legendme.missions_svc.infrastructure.security;
 
+import com.legendme.missions_svc.infrastructure.JwtAuthenticationFilter;
 import com.legendme.missions_svc.util.JwtUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

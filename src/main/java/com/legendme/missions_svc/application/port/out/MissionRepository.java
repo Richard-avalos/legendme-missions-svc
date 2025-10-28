@@ -17,6 +17,7 @@ import java.util.UUID;
 public interface MissionRepository {
 
     Mission save(Mission mission);
+    Mission update(Mission mission);
     Optional<Mission> findById(UUID id);
-    List<Mission> findByUserIdandFilter(UUID userId, MissionStatus status, String categoryCode, LocalDateTime from, LocalDateTime to);
+    List<Mission> findByUserIdAndFilter(UUID userId, MissionStatus status, String categoryCode, LocalDateTime from, LocalDateTime to);
 }
