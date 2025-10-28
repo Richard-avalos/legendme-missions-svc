@@ -3,6 +3,7 @@ package com.legendme.missions_svc.application.service;
 import com.legendme.missions_svc.application.port.in.MissionUseCase;
 import com.legendme.missions_svc.application.port.in.command.CreateMissionCommand;
 import com.legendme.missions_svc.application.port.in.command.SearchMissionCommand;
+import com.legendme.missions_svc.application.port.in.command.UpdateMissionCommand;
 import com.legendme.missions_svc.application.port.out.CategoryRepository;
 import com.legendme.missions_svc.application.port.out.MissionRepository;
 import com.legendme.missions_svc.domain.model.Category;
@@ -20,16 +21,28 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Implementación del caso de uso MissionUseCase.
+ * Proporciona la lógica de negocio para gestionar misiones.
+ */
 @Service
 @Transactional
 @AllArgsConstructor
 @Slf4j
 public class MissionService implements MissionUseCase {
 
+    /** Repositorio para operaciones de misión */
     private final MissionRepository missionRepository;
     private final CategoryRepository categoryRepository;
 
 
+    /**    * Cancela una misión específica.
+     *
+     * @param id      El ID de la misión a cancelar.
+     * @param userId  El ID del usuario que realiza la solicitud.
+     * @param reason  La razón para cancelar la misión.
+     * @return La misión cancelada.
+     */
     @Override
     public Mission cancelMission(UUID id, UUID userId, String reason) {
         log.info("[CancelMissionService] Iniciando cancelación para misión ID={}", id);
@@ -58,6 +71,14 @@ public class MissionService implements MissionUseCase {
             throw new ErrorException("Unexpected error cancelling mission");
         }
     }
+    /**    * Marca una misión como completada.
+     *
+     * @param missionId      El ID de la misión a completar.
+     * @param userId         El ID del usuario que realiza la solicitud.
+     * @param idempotencyKey La clave de idempotencia para evitar operaciones duplicadas.
+     * @param note           Una nota opcional sobre la finalización de la misión.
+     * @return La misión completada.
+     */
     @Override
     public Mission completeMission(UUID missionId, UUID userId, String idempotencyKey, String note) {
         log.info("[CompleteMissionService] Iniciando completado de misión {} para usuario {}", missionId, userId);
@@ -112,6 +133,10 @@ public class MissionService implements MissionUseCase {
         }
     }
 
+    /**    * Crea una nueva misión en el sistema.
+     *
+     * @return La misión creada.
+     */
     @Override
     public Mission createMission(CreateMissionCommand command) {
         log.info("[CreateMissionService] Creando misión para el usuario {}", command.userId());
@@ -162,6 +187,12 @@ public class MissionService implements MissionUseCase {
         }
     }
 
+    /**    * Obtiene los detalles de una misión específica.
+     *
+     * @param missionId El ID de la misión a obtener.
+     * @param userId    El ID del usuario que realiza la solicitud.
+     * @return La misión solicitada.
+     */
     @Override
     public Mission getMissionDetail(UUID missionId, UUID userId) {
         log.info("[GetMissionDetailService] Obteniendo detalle de misión {} para usuario {}", missionId, userId);
@@ -194,6 +225,13 @@ public class MissionService implements MissionUseCase {
         }
     }
 
+    /**
+     * Pausa una misión específica.
+     * @param id El ID de la misión a pausar.
+     * @param userId    El ID del usuario que realiza la solicitud.
+     * @param note      Una nota opcional sobre la pausa de la misión.
+     * @return
+     */
     @Override
     public Mission pauseMission(UUID id, UUID userId, String note) {
         log.info("[PauseMissionService] Pausing mission ID: {} del UserId: {}",id,userId);
@@ -221,6 +259,13 @@ public class MissionService implements MissionUseCase {
         }
     }
 
+    /**
+     * Busca misiones según los criterios especificados en el comando.
+     *
+     * @param command Comando con los criterios de búsqueda.
+     * @param userId  ID del usuario para filtrar las misiones.
+     * @return Lista de misiones que cumplen con los criterios de búsqueda.
+     */
     @Override
     public List<Mission> searchMission(SearchMissionCommand command, UUID userId) {
         log.info("[SearchMissionService] Buscando misiones para UsuarioID: {} con filtros: {}", userId, command);
@@ -251,6 +296,13 @@ public class MissionService implements MissionUseCase {
             throw new ErrorException("Ocurrió un error inesperado al buscar misiones");
         }
     }
+    /**
+     * Reanuda una misión específica.
+     *
+     * @param missionId El ID de la misión a reanudar.
+     * @param userId    El ID del usuario que realiza la solicitud.
+     * @return La misión reanudada.
+     */
     @Override
     public Mission startMission(UUID missionId, UUID userId) {
         log.info("[StartMissionService] Intentando iniciar misión {} para usuario {}", missionId, userId);
@@ -313,16 +365,64 @@ public class MissionService implements MissionUseCase {
     /**
      * Actualiza una misión existente.
      *
-     * @param mission Misión con los cambios aplicados
      * @return Misión actualizada
      */
-    public Mission updateMission(Mission mission) {
-        log.info("[UpdateMissionService] Actualizando misión {}", mission.uuid());
+    @Override
+    public Mission updateMission(UpdateMissionCommand command) {
+        log.info("[UpdateMissionService] Actualizando misión {}", command.missionID());
+
         try {
-            return missionRepository.update(mission);
+            Mission existingMission = missionRepository.findById(command.missionID())
+                    .orElseThrow(() -> new ErrorException(
+                            HttpStatus.NOT_FOUND,
+                            "MISSION_NOT_FOUND",
+                            "Mission not found",
+                            "No existe una misión con el ID enviado"
+                    ));
+
+            Category newCategory = categoryRepository.findById(command.categoryId())
+                    .orElseThrow(() -> new ErrorException(
+                            HttpStatus.NOT_FOUND,
+                            "CATEGORY_NOT_FOUND",
+                            "Category not found",
+                            "No existe una categoría con el ID enviado"
+                    ));
+
+            Mission updatedMission = new Mission(
+                    existingMission.uuid(),
+                    existingMission.userId(),
+                    newCategory,
+                    command.title() != null ? command.title() : existingMission.title(),
+                    command.description() != null ? command.description() : existingMission.description(),
+                    newCategory.baseXp(),
+                    command.difficulty() != null ? command.difficulty() : existingMission.difficulty(),
+                    command.streakGroup() != null ? command.streakGroup() : existingMission.streakGroup(),
+                    existingMission.status(),
+                    existingMission.startedAt(),
+                    existingMission.dueAt(),
+                    existingMission.completedAt(),
+                    existingMission.createdAt(),
+                    LocalDateTime.now()
+            );
+
+            Mission savedMission = missionRepository.update(updatedMission);
+            log.info("[UpdateMissionService] Misión {} actualizada exitosamente", savedMission.uuid());
+
+            return savedMission;
+
+        } catch (ErrorException e) {
+            log.error("[UpdateMissionService] Error controlado: {}", e.getMessage());
+            throw e;
+
         } catch (Exception e) {
-            log.error("[UpdateMissionService] Error actualizando misión {}: {}", mission.uuid(), e.getMessage());
-            throw new RuntimeException("Error al actualizar la misión", e);
+            log.error("[UpdateMissionService] Error inesperado al actualizar misión: {}", e.getMessage());
+            throw new ErrorException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "UPDATE_MISSION_FAILED",
+                    "Ocurrió un error al actualizar la misión",
+                    e.getMessage()
+            );
         }
     }
+
 }

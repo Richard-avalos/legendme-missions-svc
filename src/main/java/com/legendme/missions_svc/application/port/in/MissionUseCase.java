@@ -2,6 +2,7 @@ package com.legendme.missions_svc.application.port.in;
 
 import com.legendme.missions_svc.application.port.in.command.CreateMissionCommand;
 import com.legendme.missions_svc.application.port.in.command.SearchMissionCommand;
+import com.legendme.missions_svc.application.port.in.command.UpdateMissionCommand;
 import com.legendme.missions_svc.domain.model.Mission;
 
 import java.util.List;
@@ -24,10 +25,9 @@ public interface MissionUseCase {
     /**
      * Actualiza una misión existente en el sistema.
      *
-     * @param mission La misión con los detalles actualizados.
      * @return La misión actualizada.
      */
-    Mission updateMission(Mission mission);
+    Mission updateMission(UpdateMissionCommand command);
 
     /**
      * Obtiene los detalles de una misión específica.
@@ -59,9 +59,31 @@ public interface MissionUseCase {
      */
     Mission completeMission(UUID missionId, UUID userId, String idempotencyKey, String note);
 
+    /**
+     * Pausa una misión específica.
+     *
+     * @param missionId El ID de la misión a pausar.
+     * @param userId    El ID del usuario que realiza la solicitud.
+     * @param note      Una nota opcional sobre la pausa de la misión.
+     * @return La misión pausada.
+     */
     Mission pauseMission(UUID missionId, UUID userId, String note);
 
+    /**
+     * Reanuda una misión específica.
+     *
+     * @param missionId El ID de la misión a reanudar.
+     * @param userId    El ID del usuario que realiza la solicitud.
+     * @return La misión reanudada.
+     */
     Mission startMission(UUID missionId, UUID userId);
 
+    /**
+     * Busca misiones según los criterios especificados en el comando de búsqueda.
+     *
+     * @param command
+     * @param userId
+     * @return
+     */
     List<Mission> searchMission(SearchMissionCommand command, UUID userId);
 }

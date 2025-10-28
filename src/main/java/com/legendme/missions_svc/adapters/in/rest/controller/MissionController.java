@@ -5,6 +5,7 @@ import com.legendme.missions_svc.application.port.in.command.CreateMissionComman
 import com.legendme.missions_svc.application.port.in.command.SearchMissionCommand;
 import com.legendme.missions_svc.application.mapper.MissionMapper;
 import com.legendme.missions_svc.application.port.in.*;
+import com.legendme.missions_svc.application.port.in.command.UpdateMissionCommand;
 import com.legendme.missions_svc.domain.model.Mission;
 import com.legendme.missions_svc.shared.exceptions.ErrorException;
 import com.legendme.missions_svc.util.JwtUtils;
@@ -223,7 +224,33 @@ public class MissionController {
         UUID userId = getUserId(authHeader);
         String reason = Optional.ofNullable(cancelRequest).map(CancelRequest::reason).orElse(null);
         return ok(missionUseCase.cancelMission(id, userId, reason));
+
     }
+
+    /**
+     * Actualiza una misión existente con los nuevos detalles proporcionados.
+     * @param id
+     * @param command
+     * @return
+     */
+    @PutMapping("/update/{id}")
+    public ResponseEntity<Mission> updateMission(
+            @PathVariable UUID id,
+            @RequestBody UpdateMissionCommand command
+    ) {
+        UpdateMissionCommand fullCommand = new UpdateMissionCommand(
+                id,
+                command.title(),
+                command.description(),
+                command.categoryId(),
+                command.difficulty(),
+                command.streakGroup()
+        );
+
+        Mission updated = missionUseCase.updateMission(fullCommand);
+        return ResponseEntity.ok(updated);
+    }
+
 
     /**Estas clases representan las solicitudes para pausar, completar y cancelar misiones. */
     public static record PauseRequest(String note) {}
