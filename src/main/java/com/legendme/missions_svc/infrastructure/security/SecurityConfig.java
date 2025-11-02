@@ -1,35 +1,110 @@
 package com.legendme.missions_svc.infrastructure.security;
 
-import com.legendme.missions_svc.infrastructure.JwtAuthenticationFilter;
-import com.legendme.missions_svc.util.JwtUtils;
+import com.legendme.missions_svc.infrastructure.S2SAuthFilter;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.*;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
+/**
+ * Configuration class for Spring Security.
+ *
+ * <p>This class sets up the security filter chain, JWT decoder, and authentication converters
+ * for the application. It also integrates a custom filter for internal service authentication.</p>
+ */
 @Configuration
+@EnableMethodSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtUtils jwtUtils;
-
-    public SecurityConfig(JwtUtils jwtUtils) {
-        this.jwtUtils = jwtUtils;
-    }
-
+    /**
+     * Configures the security filter chain for the application.
+     *
+     * <p>This method disables CSRF, sets up authorization rules for specific endpoints,
+     * adds the custom S2SAuthFilter, and configures the OAuth2 resource server with JWT support.</p>
+     *
+     * @param http the {@link HttpSecurity} object to configure
+     * @param jwtAuthConverter the {@link JwtAuthenticationConverter} for converting JWT claims to authorities
+     * @return the configured {@link SecurityFilterChain}
+     * @throws Exception if an error occurs during configuration
+     */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtils::validateTokenAndGetSubject);
+    SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                            JwtAuthenticationConverter jwtAuthConverter, S2SAuthFilter s2SAuthFilter
+    ) throws Exception {
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/legendme/**").authenticated()
-                        .anyRequest().permitAll()
+                        .requestMatchers("/actuator/health",
+                                "/legendme/users/create/google-user",
+                                "/legendme/users/create", "/error", "/404").permitAll()
+                        .anyRequest().authenticated()
                 )
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(s2SAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter))
+                );
 
         return http.build();
+    }
+
+    /**
+     * Creates a {@link JwtDecoder} bean for decoding and validating JWTs.
+     *
+     * <p>This method uses a secret key and issuer to configure the decoder. It also sets up
+     * token validation with issuer validation and a timestamp validator.</p>
+     *
+     * @param secret the secret key used for signing JWTs
+     * @param issuer the expected issuer of the JWTs
+     * @return the configured {@link JwtDecoder}
+     */
+    @Bean
+    JwtDecoder jwtDecoder(@Value("${jwt.secret}") String secret,
+                          @Value("${jwt.issuer}") String issuer) {
+
+        var key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA384");
+        var decoder = NimbusJwtDecoder.withSecretKey(key)
+                .macAlgorithm(MacAlgorithm.HS384)
+                .build();
+
+        OAuth2TokenValidator<Jwt> withIssuer = JwtValidators.createDefaultWithIssuer(issuer);
+        var timestampValidator = new JwtTimestampValidator(Duration.ofSeconds(60));
+
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(withIssuer, timestampValidator));
+        return decoder;
+    }
+
+    /**
+     * S2SAuthFilter is a custom Spring Security filter that validates requests
+     * based on an internal token provided in the `X-Internal-Token` header.
+     *
+     * <p>This filter decodes and compares the provided token with a pre-configured
+     * internal token. If the tokens match, it sets an authentication object in the
+     * SecurityContext, allowing the request to proceed as an authenticated internal service.</p>
+     */
+    @Bean
+    JwtAuthenticationConverter jwtAuthConverter() {
+        var granted = new JwtGrantedAuthoritiesConverter();
+        granted.setAuthoritiesClaimName("roles");
+        granted.setAuthorityPrefix("ROLE_");
+
+        var conv = new JwtAuthenticationConverter();
+        conv.setJwtGrantedAuthoritiesConverter(granted);
+        return conv;
     }
 }

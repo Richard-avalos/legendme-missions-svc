@@ -343,7 +343,7 @@ public class MissionService implements MissionUseCase {
                     LocalDateTime.now()
             );
 
-            Mission savedMission = missionRepository.save(updatedMission);
+            Mission savedMission = missionRepository.update(updatedMission);
             log.info("[StartMissionService] Misión {} iniciada exitosamente para usuario {}", missionId, userId);
 
             return savedMission;

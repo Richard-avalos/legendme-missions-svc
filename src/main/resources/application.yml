@@ -1,8 +1,9 @@
 server:
-  port: 8080
+  port: 8081
 
 spring:
   security:
+    s2s-token: ${API_KEY}
     oauth2:
       resourceserver:
         jwt: {}
