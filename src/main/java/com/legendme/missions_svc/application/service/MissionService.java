@@ -56,7 +56,7 @@ public class MissionService implements MissionUseCase {
 
             Mission updatedMission = mission.withStatus(MissionStatus.CANCELLED);
 
-            Mission saved = missionRepository.save(updatedMission);
+            Mission saved = missionRepository.update(updatedMission);
 
             log.info("[CancelMissionService] Misión cancelada correctamente ID={}", id);
             return saved;
@@ -116,7 +116,7 @@ public class MissionService implements MissionUseCase {
             );
 
             log.info("[CompleteMissionService] Misión {} completada exitosamente", missionId);
-            return missionRepository.save(updatedMission);
+            return missionRepository.update(updatedMission);
 
         } catch (ErrorException e) {
             log.error("[CompleteMissionService] Error controlado: {}", e.getMessage());
@@ -244,7 +244,7 @@ public class MissionService implements MissionUseCase {
                         return new ErrorException("Mission not found or does not belong to user");
                     });
             Mission updateMission = mission.withStatus(MissionStatus.PAUSED);
-            Mission saved = missionRepository.save(updateMission);
+            Mission saved = missionRepository.update(updateMission);
             log.info("[PauseMissionService] Misión pausada correctamente ID={}", id);
             return saved;
 
